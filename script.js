@@ -1,77 +1,199 @@
-// Ref display element
-const display = document .getElementById('display');
+// Refrence display element
+const display = document.getElementById('display');
 
-// track if we have perform a calculation
-let justcalculated = false;
+// Track if we have performed a calculation
+let justCalculated = false;
 
-function  appendToDisplay(value) {
-    console.log('Button pressed:' value);
+function isOperator(char) {
+    return ['+', '-', '*', '/'].includes(char);
+}
 
-    let currentValue = display,value;
+function getLastChar() {
+    return display.value.slice(-1);
+}
 
-    if (justcalculated && !isNaN(value)) {
-        display,value = value;
-        justcalculated = false;
+function safeEval(expression) {
+    try {
+        let jsExpression = expression
+            .replace(/x/g, '*')
+            .replace(/÷/g, '/');
+
+        if (!/^[0-9+\-*/.() ]+$/.test(jsExpression)){
+            throw new Error('Invalid characters in expression');
+        }
+
+        const result = Function(' "use strict"; return (' + jsExpression + ')')();
+
+        if (!isFinite(result)) {
+            throw new Error('Invalid calculation result');
+        }
+
+        return result;
+    } catch (error) {
+        console.error('Calcualtion error:', error);
+        return 'Error';
+    }
+}
+
+function appendToDisplay(value) {
+    console.log('Button pressed:', value);
+
+    let currentValue = display.value;
+
+    if (justCalculated && !isNaN(value)) {
+        display.value = value;
+        justCalculated = false;
         return;
     }
 
-    // if the current display show 0 and user enters a number we wanna replace the 0
-    if (currentValue === '0' &&  !isNaN(value)) {
-       display.value = value;
+    if (justCalculated && isOperator(value)) {
+        display.value = currentValue + value;
+        justCalculated = false;
+        return;
     }
 
-    //if the user enters a desimal we wanna keep the 0
-    else if (currentValue === '0' && value === '.') {
-      display.value = currentValue + value;  
+    // Handles operators
+    if (isOperator(value)){
+        // Dont allow operator as first char (exception for minus)
+        if (currentValue === '0' && value !== '-'){
+            return; // Do nothing
+        }
+
+        // If the last character is already an operator, replace it
+        if (isOperator(getLastChar())) {
+            display.value = currentValue.slice(0, -1) + value;
+        } else {
+            display.value = currentValue + value;
+        }
+
+    } else if (!isNaN(value)){
+
+        if (currentValue === '0'){
+            display.value = value;
+        } else {
+            display.value = currentValue + value;
+        }
+
+    } else if (value === '.' ) {
+
+        if (currentValue === '0') {
+            display.value = currentValue + value;
+        } else {
+            // Get the last number in the display (after last operator)
+            let parts = currentValue.split('/[+\-*/');
+            let lastNumber = parts[parts.length - 1];
+
+            // Only add decimal if number doesn't already have one
+            if (!lastNumber.includes('.')){
+                display.value = currentValue + value;
+            }
+        }
     } else {
         display.value = currentValue + value;
     }
 
-    //reset the justcalculated flag when user starts typing
-    justcalculated = false;
-     
+    // Reset the justCalculated flag when user starts typing
+    justCalculated = false;
+
     console.log('Display updated to: ', display.value);
-} 
+}
 
-function cleardiplay() {
-    console.log('Clear button pressed');
+function clearDisplay() {
+    console.log('Clear button pressed.');
 
-    action('Clear button was clicked');
+    display.value = '0';
+    justCalculated = false;
+
+    display.style.backgroundColor = '#f0f0f0';
+    setTimeout(() => {
+        display.style.backgroundColor = '';
+    }, 150);
+
 }
 
 function deleteLast() {
-      console.log('Backspace button was clicked');
+    console.log('Backspace button pressed.');
 
-      let currentValue = display.value;
+    let currentValue = display.value;
 
-      //if there only one carracter or is 0, reset to 0
-
-      if (currentValue.length <=1 || currentValue === '0'){
+    // If theres only one character or its 0, reset to 0
+    if (currentValue.length <= 1 || currentValue === '0') {
         display.value = '0';
-      } else {
+    } else {
         display.value = currentValue.slice(0, -1);
-      }
-
-    action('Backspace button was clicked');
+    }
 }
 
-function calculation() {
-      console.log('Equals button pressed');
+function calculate() {
+    let expression = display.value;
 
-    action('Equals button was clicked');
-    
+    // Dont calc if display is 0 or empty
+    if (expression === '0' || expression === ''){
+        return;
+    }
+
+    // Dont calc if expression ends with operator
+    if (isOperator(getLastChar())){
+        return;
+    }
+
+    let result = safeEval(expression);
+
+    if (result === 'Error') {
+        display.value = 'Error';
+        setTimeout(() => {
+            clearDisplay()
+        }, 2000);
+    } else {
+        if (Number.isInteger(result)) {
+            display.value = result.toString();
+        } else {
+            display.value = parseFloat(result.toFixed(10)).toString();
+        }
+
+        justCalculated = true;
+    }
+
+    display.style.backgroundColor = '#e8f5e8';
+    setTimeout(() => {
+        display.style.backgroundColor = '';
+    }, 300);
 }
 
-document .addEventListerner('DOMcontentloader', function () {
-    console.console.log('Calculator loades succesfully');
-    console.console.log('Display element', display);
+document.addEventListener('keydown', function(event) {
+    console.log('Key pressed', event.key);
 
-   if (display) {
-    console.console.log('Current display value', display.value);
-    
- } else{
-    console.console.log('Display element not found');
-    
- }
-    
+    if (event.key >= '0' && event.key <= '9') {
+        appendToDisplay(event.key);
+    } else if (event.key === '.') {
+        appendToDisplay('.');
+    } else if (event.key === '+') {
+        appendToDisplay('+');
+    } else if (event.key === '-') {
+        appendToDisplay('-');
+    } else if (event.key === '*') {
+        appendToDisplay('*');
+    } else if (event.key === '/') {
+        event.preventDefault();
+        appendToDisplay('/');
+    }
+
+    else if (event.key === 'Enter' || event.key === '=') {
+        calculate();
+    } else if (event.key === 'Escape' || event.key === 'c' || event.key === 'C') {
+        clearDisplay();
+    } else if (event.key === 'Backspace') {
+        deleteLast();
+    }
+})
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Calculator loaded successfully');
+    console.log('Display element', display);
+
+    if (display) {
+        console.log('Current display value: ', display.value);
+    } else {
+        console.log('Display element not found');
+    }
 })
